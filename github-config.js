@@ -19,7 +19,7 @@
 const GITHUB_OWNER = "Jason-cnmd";
 
 // ② 本项目的仓库名（Repository）
-const GITHUB_REPO = "-";
+const GITHUB_REPO = "数据库";
 
 // ③ Fine-grained 访问令牌（只给本项目仓库 Contents 读写权限即可）
 const GITHUB_TOKEN = "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";

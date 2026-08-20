@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据库学习乐园</title>
+  <meta name="description" content="以个人数据文件演示数据库概念的学习平台，需登录后使用。">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ========== 登录 / 注册界面 ========== -->
+  <div id="authOverlay" class="auth-overlay hidden">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <h1>📚 数据库学习乐园</h1>
+        <p>每个账号的数据保存在自己的文件里</p>
+      </div>
+
+      <nav class="auth-tabs">
+        <button id="loginTab" class="auth-tab active">登 录</button>
+        <button id="registerTab" class="auth-tab">注 册</button>
+      </nav>
+
+      <!-- 登录表单 -->
+      <form id="loginForm" class="auth-form">
+        <label for="loginEmail">邮箱</label>
+        <input id="loginEmail" type="email" placeholder="你的邮箱" autocomplete="email">
+        <label for="loginPassword">密码</label>
+        <input id="loginPassword" type="password" placeholder="你的密码" autocomplete="current-password">
+        <button type="submit" class="btn btn-primary btn-block">登 录</button>
+        <p class="auth-switch">还没有账号？<a id="goRegister" href="javascript:void(0)">去注册</a></p>
+      </form>
+
+      <!-- 注册表单 -->
+      <form id="registerForm" class="auth-form hidden">
+        <label for="regEmail">邮箱</label>
+        <input id="regEmail" type="email" placeholder="你的邮箱" autocomplete="email">
+        <label for="regPassword">密码（至少 4 位）</label>
+        <input id="regPassword" type="password" placeholder="设置密码" autocomplete="new-password">
+        <label for="regStudentNo">学号（向老师领取）</label>
+        <input id="regStudentNo" type="text" placeholder="例如：2026001" autocomplete="off">
+        <button type="submit" class="btn btn-primary btn-block">注 册</button>
+        <p class="auth-switch">已有账号？<a id="goLogin" href="javascript:void(0)">去登录</a></p>
+      </form>
+
+      <div id="authMsg" class="auth-msg"></div>
+    </div>
+  </div>
+
+  <!-- ========== 主界面 ========== -->
+  <div id="mainApp" class="hidden">
+
+    <header class="site-header">
+      <div class="header-inner">
+        <h1>📚 数据库学习乐园</h1>
+        <div class="user-bar">
+          <span id="userEmail" class="user-info"></span>
+          <span id="userName" class="user-info"></span>
+          <button id="logoutBtn" class="btn btn-sm btn-ghost" style="width:auto">退出登录</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-layout">
+
+      <!-- 左侧 -->
+      <aside class="sidebar">
+
+        <!-- 存储状态 -->
+        <section class="panel">
+          <h2 class="panel-title">🔌 数据存储</h2>
+          <div id="connStatus" class="conn-status">
+            <div id="connDot" class="conn-dot"></div>
+            <span id="connText">正在连接…</span>
+          </div>
+          <p class="conn-sub" id="connSub">数据文件保存在 GitHub 仓库</p>
+        </section>
+
+        <!-- 表导航 -->
+        <section class="panel">
+          <h2 class="panel-title">🗂️ 数据库中的表</h2>
+          <div id="tableList" class="table-list">
+            <p class="hint">加载中…</p>
+          </div>
+        </section>
+
+        <!-- 我的资料 -->
+        <section class="panel">
+          <h2 class="panel-title">📝 我的资料</h2>
+          <span id="myName" class="hidden"></span>
+          <form id="profileForm" class="form-group">
+            <label for="myNo">学号（不可修改）</label>
+            <input id="myNo" type="text" disabled>
+            <label for="pfName">姓名</label>
+            <input id="pfName" type="text" placeholder="姓名">
+            <label for="pfGender">性别</label>
+            <select id="pfGender">
+              <option value="男">男</option>
+              <option value="女">女</option>
+            </select>
+            <label for="pfClass">班级</label>
+            <input id="pfClass" type="text" placeholder="班级，如：高三(1)班">
+            <button type="submit" class="btn btn-primary btn-sm">保存修改</button>
+          </form>
+        </section>
+
+        <!-- 登记成绩 -->
+        <section class="panel">
+          <h2 class="panel-title">＋ 登记我的成绩</h2>
+          <form id="scoreForm" class="form-group">
+            <label for="scoreCourse">课程</label>
+            <select id="scoreCourse"></select>
+            <label for="scoreInput">成绩（0~100）</label>
+            <input id="scoreInput" type="number" min="0" max="100" step="0.5" placeholder="成绩">
+            <button type="submit" class="btn btn-primary btn-sm">＋ 登记成绩</button>
+          </form>
+          <table class="score-table">
+            <thead><tr><th>课程</th><th>成绩</th><th></th></tr></thead>
+            <tbody id="scoreBody"></tbody>
+          </table>
+          <div id="opMsg" class="op-msg"></div>
+        </section>
+
+        <!-- 制作专属网页 -->
+        <section class="panel">
+          <h2 class="panel-title">🌟 制作我的专属网页</h2>
+          <form id="pageForm" class="form-group">
+            <input id="pageName" type="text" placeholder="输入你的名字">
+            <button type="submit" class="btn btn-primary btn-sm">🌟 生成我的专属网页</button>
+            <div id="pageLinkBox" class="hidden" style="margin-top:10px">
+              <a id="pageLink" class="gh-page-link" target="_blank" rel="noopener"></a>
+            </div>
+            <p id="pageTip" class="op-msg" style="margin-top:8px"></p>
+          </form>
+        </section>
+
+      </aside>
+
+      <!-- 中间：SQL 工作区 -->
+      <section class="workspace">
+        <div class="editor-panel">
+          <div class="editor-header">
+            <span class="editor-label">SQL 编辑器</span>
+          </div>
+          <textarea id="sqlInput" spellcheck="false" placeholder="SELECT * FROM students;"></textarea>
+          <div class="editor-actions">
+            <button id="runBtn" class="btn btn-primary">▶ 执行</button>
+            <button id="clearBtn" class="btn btn-ghost">清空</button>
+          </div>
+        </div>
+
+        <div class="result-panel">
+          <div class="result-header">
+            <span class="result-label">执行结果</span>
+            <span id="sqlMsg" class="message"></span>
+          </div>
+          <div id="welcome" class="welcome">
+            <p>执行结果将显示在这里。</p>
+          </div>
+          <div id="resultBox" class="hidden">
+            <p class="result-meta" id="resultMeta"></p>
+            <div class="table-scroll">
+              <table id="resultTable" class="result-table">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SQL 示例 -->
+        <div class="examples-panel">
+          <div class="editor-header">
+            <span class="editor-label">✨ SQL 示例</span>
+          </div>
+          <div id="examplesWrap" class="sql-examples"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>数据库学习乐园 · 数据以文件形式保存在 GitHub 仓库 · 仅用于教学</p>
+    </footer>
+
+  </div>
+
+  <!-- GitHub 连接配置（部署前必须填写） -->
+  <script src="github-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

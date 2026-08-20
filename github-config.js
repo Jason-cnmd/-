@@ -16,13 +16,13 @@
 // ============================================================
 
 // ① 你的 GitHub 用户名（Owner）
-const GITHUB_OWNER = "你的GitHub用户名";
+const GITHUB_OWNER = "Jason-cnmd";
 
 // ② 本项目的仓库名（Repository）
-const GITHUB_REPO = "database-playground";
+const GITHUB_REPO = "-";
 
 // ③ Fine-grained 访问令牌（只给本项目仓库 Contents 读写权限即可）
-const GITHUB_TOKEN = "github_pat_你的令牌";
+const GITHUB_TOKEN = "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";
 
 // ④ 数据文件存放目录（默认 data，一般不用改）
 //    账号、学生档案、成绩文件都保存在这个目录下

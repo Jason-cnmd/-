@@ -3,13 +3,12 @@
 //
 // 本版本不使用外部数据库，所有数据都以"文件"形式保存在
 // 你的 GitHub 仓库 data/ 目录下：
-//   data/_students.json  学生名单（预置，学号+姓名+初始成绩）
 //   data/_courses.json   课程表（共享）
 //   data/_accounts.json  账号表（注册时追加）
-//   data/2026001.json    每个学生一个数据文件（档案 + 成绩）
+//   data/<邮箱>.json     每个学生一个数据文件（档案 + 成绩）
 //
 // 登录 / 注册：读取、比对、写入 data/_accounts.json
-// 数据隔离：登录后只加载"自己"的数据文件（前端按学号读取）
+// 数据隔离：登录后只加载"自己"的数据文件（前端按邮箱读取）
 // ============================================================
 
 const $ = (id) => document.getElementById(id);
@@ -17,9 +16,8 @@ const $ = (id) => document.getElementById(id);
 const GITHUB_API = 'https://api.github.com';
 const DATA_DIR = typeof GITHUB_FOLDER === 'string' && GITHUB_FOLDER ? GITHUB_FOLDER : 'data';
 
-let currentUser = null; // { email, studentNo, name }
+let currentUser = null; // { email, name }
 let myData = null;      // 当前登录学生数据文件内容
-let studentsCache = []; // 预置学生名单
 let coursesCache = [];  // 课程表
 let lastResult = null;  // 最近一次 SQL 结果（供导出/生成网页）
 
@@ -33,8 +31,13 @@ const EXAMPLES = [
   { title: '7️⃣ 求最高分 MAX', sql: 'SELECT MAX(score) AS 最高分 FROM scores;' },
   { title: '8️⃣ 模糊查询 LIKE（名称含“语”的课）', sql: 'SELECT * FROM courses WHERE name LIKE \'%语%\';' },
   { title: '9️⃣ 课程表（按学分排序）', sql: 'SELECT * FROM courses ORDER BY credit DESC;' },
-  { title: '🔟 条件筛选（我的性别）', sql: 'SELECT student_no, name FROM students WHERE gender = \'男\';' },
+  { title: '🔟 条件筛选（我的性别）', sql: 'SELECT name, email FROM students WHERE gender = \'男\';' },
 ];
+
+// 邮箱 -> 文件名（把非字母数字字符替换为下划线，如 a@b.c -> a_b_c）
+function emailToFileKey(email) {
+  return String(email || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+}
 
 // ============================================================
 // GitHub 文件读写
@@ -184,49 +187,43 @@ async function doLogin(e) {
     if (!accounts || !accounts.length) { showAuthMsg('还没有任何账号，请先注册'); return; }
     const acc = accounts.find((a) => a.email === email);
     if (!acc || acc.password !== password) { showAuthMsg('邮箱或密码不正确'); return; }
-    await afterLogin(email, acc.studentNo);
+    await afterLogin(email);
   } catch (err) {
     console.error(err);
     showAuthMsg('登录失败：' + (err.message || '网络错误'));
   }
 }
 
-// 注册：校验学号在名单中 -> 检查重复 -> 追加账号 -> 创建个人数据文件 -> 自动登录
+// 注册：检查邮箱重复 -> 追加账号 -> 创建个人数据文件 -> 自动登录
 async function doRegister(e) {
   e.preventDefault();
   showAuthMsg('正在注册…');
   const email = $('regEmail').value.trim().toLowerCase();
   const password = $('regPassword').value;
-  const studentNo = $('regStudentNo').value.trim();
-  if (!email || !password || !studentNo) { showAuthMsg('请填写邮箱、密码和学号'); return; }
+  if (!email || !password) { showAuthMsg('请填写邮箱和密码'); return; }
   if (password.length < 4) { showAuthMsg('密码至少 4 位'); return; }
   try {
-    const students = await ghReadJson(DATA_DIR + '/_students.json');
-    const stu = students ? students.find((s) => s.student_no === studentNo) : null;
-    if (!stu) { showAuthMsg('学号不存在，请使用老师发放的学号'); return; }
-
     const accounts = (await ghReadJson(DATA_DIR + '/_accounts.json')) || [];
     if (accounts.find((a) => a.email === email)) { showAuthMsg('该邮箱已注册，请直接登录'); return; }
-    if (accounts.find((a) => a.studentNo === studentNo)) { showAuthMsg('该学号已被注册，请联系老师'); return; }
 
-    accounts.push({ email, password, studentNo });
+    accounts.push({ email, password });
     await ghWriteJson(DATA_DIR + '/_accounts.json', accounts);
 
     // 创建该学生的个人数据文件（若还不存在）
-    const myPath = DATA_DIR + '/' + studentNo + '.json';
+    const myPath = DATA_DIR + '/' + emailToFileKey(email) + '.json';
     const existing = await ghReadJson(myPath);
     if (!existing) {
       await ghWriteJson(myPath, {
-        student_no: stu.student_no,
-        name: stu.name,
-        gender: stu.gender,
-        class_name: stu.class_name,
-        scores: stu.scores || [],
+        email,
+        name: '',
+        gender: '男',
+        class_name: '',
+        scores: [],
       });
     }
 
     showAuthMsg('注册成功，正在进入…', 'ok');
-    await afterLogin(email, studentNo);
+    await afterLogin(email);
   } catch (err) {
     console.error(err);
     showAuthMsg('注册失败：' + (err.message || '网络错误'));
@@ -234,31 +231,28 @@ async function doRegister(e) {
 }
 
 // 登录/注册成功后：读取个人数据 -> 刷新界面
-async function afterLogin(email, studentNo) {
-  const students = (await ghReadJson(DATA_DIR + '/_students.json')) || [];
-  const stu = students.find((s) => s.student_no === studentNo);
-  currentUser = { email, studentNo, name: stu ? stu.name : studentNo };
-  saveSession(currentUser);
-
-  const myPath = DATA_DIR + '/' + studentNo + '.json';
+async function afterLogin(email) {
+  const myPath = DATA_DIR + '/' + emailToFileKey(email) + '.json';
   myData = await ghReadJson(myPath);
   if (!myData) {
     myData = {
-      student_no: studentNo,
-      name: stu ? stu.name : studentNo,
-      gender: stu ? stu.gender : '',
-      class_name: stu ? stu.class_name : '',
-      scores: stu ? (stu.scores || []) : [],
+      email,
+      name: '',
+      gender: '男',
+      class_name: '',
+      scores: [],
     };
     await ghWriteJson(myPath, myData);
   }
+  currentUser = { email, name: myData.name || '' };
+  saveSession(currentUser);
 
   loadTableList();
   loadMyInfo();
   $('authOverlay').classList.add('hidden');
   $('mainApp').classList.remove('hidden');
   $('userEmail').textContent = currentUser.email;
-  $('userName').textContent = `${myData.name}（学号 ${studentNo}）`;
+  $('userName').textContent = `${myData.name || '同学'}（${currentUser.email}）`;
   setConnStatus(true);
 }
 
@@ -301,8 +295,8 @@ async function loadTableList() {
 // 我的资料 / 登记成绩
 // ============================================================
 function loadMyInfo() {
-  $('myName').textContent = myData.name;
-  $('myNo').textContent = myData.student_no;
+  $('myName').textContent = myData.name || '同学';
+  $('myEmail').textContent = myData.email || currentUser.email;
   $('pfName').value = myData.name;
   $('pfGender').value = myData.gender || '男';
   $('pfClass').value = myData.class_name || '';
@@ -372,7 +366,7 @@ async function addScore(e) {
 // 保存我的数据文件并刷新界面
 async function saveMyData(msg) {
   try {
-    await ghWriteJson(DATA_DIR + '/' + currentUser.studentNo + '.json', myData);
+    await ghWriteJson(DATA_DIR + '/' + emailToFileKey(currentUser.email) + '.json', myData);
     loadTableList();
     renderScores();
     $('opMsg').textContent = '✅ ' + msg;
@@ -390,7 +384,7 @@ async function saveMyData(msg) {
 function getTableData(table) {
   if (table === 'students') {
     return [{
-      student_no: myData.student_no,
+      email: myData.email || currentUser.email,
       name: myData.name,
       gender: myData.gender,
       class_name: myData.class_name,
@@ -639,7 +633,7 @@ async function generateMyPage(e) {
 <body>
 <div class="card">
   <h1>${name} 的数据库乐园</h1>
-  <div class="meta">学号 ${myData.student_no} · ${myData.class_name} · 数据保存在 GitHub 个人文件中</div>
+  <div class="meta">邮箱 ${myData.email} · ${myData.class_name} · 数据保存在 GitHub 个人文件中</div>
   <span class="stat">已选 ${scores.length} 门</span>
   <span class="stat">平均分 ${avg}</span>
   <table>
@@ -683,10 +677,9 @@ async function init() {
   }
   bindEvents();
 
-  // 加载共享数据（课程表、学生名单）
+  // 加载共享数据（课程表）
   try {
     coursesCache = (await ghReadJson(DATA_DIR + '/_courses.json')) || [];
-    studentsCache = (await ghReadJson(DATA_DIR + '/_students.json')) || [];
   } catch (err) {
     console.error('加载共享数据失败', err);
   }
@@ -694,9 +687,9 @@ async function init() {
 
   // 恢复会话
   const sess = loadSession();
-  if (sess && sess.email && sess.studentNo) {
+  if (sess && sess.email) {
     try {
-      await afterLogin(sess.email, sess.studentNo);
+      await afterLogin(sess.email);
       return;
     } catch (err) {
       console.error('会话恢复失败，回到登录页', err);
